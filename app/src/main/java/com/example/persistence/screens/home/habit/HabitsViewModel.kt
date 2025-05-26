@@ -46,6 +46,10 @@ class HabitsViewModel : ViewModel() {
     private fun fetchTodayLogStatus(habitList: List<Habit>) {
         viewModelScope.launch {
             val statusMapFromFirestore = mutableMapOf<String, Boolean>()
+            val aggregateRef = db.collection("users").document(userId!!)
+                .collection("dailyAggregates").document(todayId)
+
+            // Step 1: Fetch today's log status for each habit
             habitList.forEach { habit ->
                 val logRef = db.collection("users").document(userId!!)
                     .collection("habits").document(habit.habitId)
@@ -55,20 +59,37 @@ class HabitsViewModel : ViewModel() {
                     val document = logRef.get().await()
                     statusMapFromFirestore[habit.habitId] = document.getBoolean("isCompleted") ?: false
                 } catch (e: Exception) {
-                    // Handle error if needed
+                    // Optional: log or handle individual fetch errors
                 }
             }
 
-            // Merge optimistic updates
+            // Step 2: Create dailyAggregate if it doesn't exist
+            try {
+                val snapshot = aggregateRef.get().await()
+                if (!snapshot.exists()) {
+                    val aggregateData = mapOf(
+                        "totalHabits" to habitList.size,
+                        "completedHabits" to 0,
+                        "timeStamp" to com.google.firebase.Timestamp.now()
+                    )
+                    aggregateRef.set(aggregateData).await()
+                }
+            } catch (e: Exception) {
+                // Optional: log or handle aggregate creation error
+            }
+
+            // Step 3: Merge optimistic updates
             val mergedMap = statusMapFromFirestore.toMutableMap()
             for ((habitId, localStatus) in optimisticStatusMap) {
                 if (mergedMap[habitId] != localStatus) {
                     mergedMap[habitId] = localStatus
                 }
             }
+
             _habitStatusMap.value = mergedMap.toMap()
         }
     }
+
 
 
     fun updateHabitStatus(habit: Habit, isChecked: Boolean, onComplete: () -> Unit = {}) {

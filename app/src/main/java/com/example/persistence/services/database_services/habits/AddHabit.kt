@@ -25,10 +25,8 @@ fun addHabitToUser(habit: Habit, onComplete: (Boolean, String?) -> Unit) {
             val currentTotal = if (aggSnap.exists()) aggSnap.getLong("totalHabits") ?: 0 else 0
             val currentCompleted = if (aggSnap.exists()) aggSnap.getLong("completedHabits") ?: 0 else 0
 
-            // ✅ THEN: Write habit
             transaction.set(habitRef, habit)
 
-            // ✅ THEN: Write aggregate
             val newAgg: Map<String, Any> = mapOf(
                 "totalHabits" to currentTotal + 1,
                 "completedHabits" to currentCompleted,
