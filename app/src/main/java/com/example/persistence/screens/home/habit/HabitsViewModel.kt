@@ -17,6 +17,7 @@ class HabitsViewModel : ViewModel() {
 
     private val db = FirebaseFirestore.getInstance()
     private val userId = FirebaseAuth.getInstance().currentUser?.uid
+
     private val _habits = MutableStateFlow<List<Habit>>(emptyList())
     private val _habitStatusMap = MutableStateFlow<Map<String, Boolean>>(emptyMap())
     private val optimisticStatusMap = mutableMapOf<String, Boolean>()
@@ -37,7 +38,12 @@ class HabitsViewModel : ViewModel() {
         db.collection("users").document(userId!!).collection("habits")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) return@addSnapshotListener
-                val habitList = snapshot?.documents?.mapNotNull { it.toObject(Habit::class.java) } ?: emptyList()
+
+                val habitList = snapshot?.documents?.mapNotNull { doc ->
+                    // Important: ensure habitId is assigned from doc.id
+                    doc.toObject(Habit::class.java)?.copy(habitId = doc.id)
+                } ?: emptyList()
+
                 _habits.value = habitList
                 fetchTodayLogStatus(habitList)
             }
@@ -51,7 +57,7 @@ class HabitsViewModel : ViewModel() {
 
             // Step 1: Fetch today's log status for each habit
             habitList.forEach { habit ->
-                val logRef = db.collection("users").document(userId!!)
+                val logRef = db.collection("users").document(userId)
                     .collection("habits").document(habit.habitId)
                     .collection("logs").document(todayId)
 
@@ -78,19 +84,15 @@ class HabitsViewModel : ViewModel() {
                 // Optional: log or handle aggregate creation error
             }
 
-            // Step 3: Merge optimistic updates
+            // Step 3: Merge optimistic updates so UI shows latest
             val mergedMap = statusMapFromFirestore.toMutableMap()
             for ((habitId, localStatus) in optimisticStatusMap) {
-                if (mergedMap[habitId] != localStatus) {
-                    mergedMap[habitId] = localStatus
-                }
+                mergedMap[habitId] = localStatus
             }
 
             _habitStatusMap.value = mergedMap.toMap()
         }
     }
-
-
 
     fun updateHabitStatus(habit: Habit, isChecked: Boolean, onComplete: () -> Unit = {}) {
         // Optimistic UI update
@@ -101,10 +103,10 @@ class HabitsViewModel : ViewModel() {
         // Store optimistic state
         optimisticStatusMap[habit.habitId] = isChecked
 
-        // Firestore update
-        HabitStatus(habit, isChecked) { success, error ->
+        // Firestore update & streak logic
+        HabitStatus(habit, isChecked) { success, _ ->
             if (!success) {
-                // Revert on failure
+                // Revert optimistic update on failure
                 val revertedMap = _habitStatusMap.value.toMutableMap()
                 revertedMap[habit.habitId] = !isChecked
                 _habitStatusMap.value = revertedMap.toMap()

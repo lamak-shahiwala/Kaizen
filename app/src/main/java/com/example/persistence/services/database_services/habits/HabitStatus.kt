@@ -72,12 +72,39 @@ fun HabitStatus(habit: Habit, isCompleted: Boolean, onComplete: (Boolean, String
                             lastCal.get(Calendar.DAY_OF_YEAR) == yestCal.get(Calendar.DAY_OF_YEAR)
                 } ?: false
 
-                newCurrentStreak = if (completedYesterday) currentStreak + 1 else 1
+                val lastDate = lastCompletedTimestamp?.toDate()
+                val wasToday = lastDate?.let {
+                    val cal = Calendar.getInstance().apply { time = it }
+                    val todayCal = Calendar.getInstance().apply { time = todayDate }
+                    cal.get(Calendar.YEAR) == todayCal.get(Calendar.YEAR) &&
+                            cal.get(Calendar.DAY_OF_YEAR) == todayCal.get(Calendar.DAY_OF_YEAR)
+                } ?: false
+
+                // If habit was unchecked earlier today and now checked again, restore streak
+                newCurrentStreak = if (wasToday && currentStreak > 0) {
+                    currentStreak // restore streak without resetting
+                } else if (completedYesterday) {
+                    currentStreak + 1
+                } else {
+                    1
+                }
                 newLongestStreak = maxOf(newLongestStreak, newCurrentStreak)
                 newLastCompletedDate = Timestamp.now()
-            } else {
-                newCurrentStreak = 0
-                newLastCompletedDate = null
+
+            } else if (prevCompleted == true && logExisted) {
+                val lastDate = lastCompletedTimestamp?.toDate()
+                val wasToday = lastDate?.let {
+                    val cal = Calendar.getInstance().apply { time = it }
+                    val todayCal = Calendar.getInstance().apply { time = todayDate }
+                    cal.get(Calendar.YEAR) == todayCal.get(Calendar.YEAR) &&
+                            cal.get(Calendar.DAY_OF_YEAR) == todayCal.get(Calendar.DAY_OF_YEAR)
+                } ?: false
+
+                if (wasToday) {
+                    newCurrentStreak = (currentStreak - 1).coerceAtLeast(0)
+                    newLastCompletedDate = null
+                }
+                // if uncheck was not today, don't change streak or lastCompletedDate
             }
 
             transaction.update(habitRef, mapOf(
