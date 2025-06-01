@@ -64,47 +64,33 @@ fun HabitStatus(habit: Habit, isCompleted: Boolean, onComplete: (Boolean, String
             )
             transaction.set(logRef, logData)
 
+            val lastDate = lastCompletedTimestamp?.toDate()
+            val lastCal = Calendar.getInstance().apply { time = lastDate ?: Date(0) }
+
+            val todayCal = Calendar.getInstance().apply { time = todayDate }
+            val yesterdayCal = Calendar.getInstance().apply { time = todayDate }
+            yesterdayCal.add(Calendar.DAY_OF_YEAR, -1)
+
+            val isSameAsToday = lastCal.get(Calendar.YEAR) == todayCal.get(Calendar.YEAR) &&
+                    lastCal.get(Calendar.DAY_OF_YEAR) == todayCal.get(Calendar.DAY_OF_YEAR)
+
+            val isSameAsYesterday = lastCal.get(Calendar.YEAR) == yesterdayCal.get(Calendar.YEAR) &&
+                    lastCal.get(Calendar.DAY_OF_YEAR) == yesterdayCal.get(Calendar.DAY_OF_YEAR)
+
             if (isCompleted) {
-                val completedYesterday = lastCompletedTimestamp?.toDate()?.let {
-                    val lastCal = Calendar.getInstance().apply { time = it }
-                    val yestCal = Calendar.getInstance().apply { time = yesterdayDate }
-                    lastCal.get(Calendar.YEAR) == yestCal.get(Calendar.YEAR) &&
-                            lastCal.get(Calendar.DAY_OF_YEAR) == yestCal.get(Calendar.DAY_OF_YEAR)
-                } ?: false
-
-                val lastDate = lastCompletedTimestamp?.toDate()
-                val wasToday = lastDate?.let {
-                    val cal = Calendar.getInstance().apply { time = it }
-                    val todayCal = Calendar.getInstance().apply { time = todayDate }
-                    cal.get(Calendar.YEAR) == todayCal.get(Calendar.YEAR) &&
-                            cal.get(Calendar.DAY_OF_YEAR) == todayCal.get(Calendar.DAY_OF_YEAR)
-                } ?: false
-
-                // If habit was unchecked earlier today and now checked again, restore streak
-                newCurrentStreak = if (wasToday && currentStreak > 0) {
-                    currentStreak // restore streak without resetting
-                } else if (completedYesterday) {
-                    currentStreak + 1
-                } else {
-                    1
+                newCurrentStreak = when {
+                    isSameAsToday -> currentStreak + 1 // restore streak after unchecking
+                    isSameAsYesterday -> currentStreak + 1 // continued streak
+                    else -> 1 // new streak
                 }
+
                 newLongestStreak = maxOf(newLongestStreak, newCurrentStreak)
                 newLastCompletedDate = Timestamp.now()
 
             } else if (prevCompleted == true && logExisted) {
-                val lastDate = lastCompletedTimestamp?.toDate()
-                val wasToday = lastDate?.let {
-                    val cal = Calendar.getInstance().apply { time = it }
-                    val todayCal = Calendar.getInstance().apply { time = todayDate }
-                    cal.get(Calendar.YEAR) == todayCal.get(Calendar.YEAR) &&
-                            cal.get(Calendar.DAY_OF_YEAR) == todayCal.get(Calendar.DAY_OF_YEAR)
-                } ?: false
-
-                if (wasToday) {
+                if (isSameAsToday) {
                     newCurrentStreak = (currentStreak - 1).coerceAtLeast(0)
-                    newLastCompletedDate = null
                 }
-                // if uncheck was not today, don't change streak or lastCompletedDate
             }
 
             transaction.update(habitRef, mapOf(

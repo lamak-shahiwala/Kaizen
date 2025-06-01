@@ -8,6 +8,7 @@ import com.google.firebase.firestore.SetOptions
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.google.firebase.firestore.FieldValue
 
 fun DeleteHabit(habit: Habit, onComplete: (Boolean, String?) -> Unit) {
     val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return onComplete(false, "No user found")
@@ -16,6 +17,7 @@ fun DeleteHabit(habit: Habit, onComplete: (Boolean, String?) -> Unit) {
 
     val aggRef = db.collection("users").document(uid).collection("dailyAggregates").document(todayId)
     val habitRef = db.collection("users").document(uid).collection("habits").document(habit.habitId)
+    val logsRef = habitRef.collection("logs")
 
     isHabitCompletedToday(habit.habitId) { isCompletedToday, error ->
         if (error != null || isCompletedToday == null) {
@@ -23,33 +25,41 @@ fun DeleteHabit(habit: Habit, onComplete: (Boolean, String?) -> Unit) {
             return@isHabitCompletedToday
         }
 
-        db.runTransaction { transaction ->
-            // 🔍 Fetch current aggregate data
-            val aggSnapshot = transaction.get(aggRef)
-            val currentTotal = aggSnapshot.getLong("totalHabits") ?: 0
-            val currentCompleted = aggSnapshot.getLong("completedHabits") ?: 0
+        logsRef.get()
+            .addOnSuccessListener { snapshot ->
+                val batch = db.batch()
 
-            val newTotal = (currentTotal - 1).coerceAtLeast(0)
-            val newCompleted = if (isCompletedToday) (currentCompleted - 1).coerceAtLeast(0) else currentCompleted
+                // Delete all logs
+                for (doc in snapshot.documents) {
+                    batch.delete(doc.reference)
+                }
 
-            // 🧹 Delete the habit
-            transaction.delete(habitRef)
+                // Delete habit doc
+                batch.delete(habitRef)
 
-            // 🧮 Update aggregates
-            transaction.set(
-                aggRef,
-                mapOf(
-                    "totalHabits" to newTotal,
-                    "completedHabits" to newCompleted,
-                    "timeStamp" to Timestamp.now()
-                ),
-                SetOptions.merge()
-            )
-        }.addOnSuccessListener {
-            onComplete(true, null)
-        }.addOnFailureListener { e ->
-            onComplete(false, e.message)
-        }
+                // Update daily aggregates
+                val currentDate = Timestamp.now()
+                batch.set(
+                    aggRef,
+                    mapOf(
+                        "totalHabits" to FieldValue.increment(-1),
+                        "completedHabits" to if (isCompletedToday) FieldValue.increment(-1) else FieldValue.increment(0),
+                        "timeStamp" to currentDate
+                    ),
+                    SetOptions.merge()
+                )
+
+                batch.commit()
+                    .addOnSuccessListener {
+                        onComplete(true, null)
+                    }
+                    .addOnFailureListener { e ->
+                        onComplete(false, e.message)
+                    }
+            }
+            .addOnFailureListener { e ->
+                onComplete(false, e.message)
+            }
     }
 }
 
