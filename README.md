@@ -24,7 +24,7 @@
 | Loading Screen     | <img src="app/screenshots/lm_loading.jpg" alt="" width="220" />   | <img src="app/screenshots/dm_loading.jpg" alt="" width="220" />   |
 | Create Habit     | <img src="app/screenshots/lm_createHabit.jpg" alt="" width="220" />   | <img src="app/screenshots/dm_createHabit.jpg" alt="" width="220" />   |
 | Delete Habit     | <img src="app/screenshots/lm_deleteHabit.jpg" alt="" width="220" />   | <img src="app/screenshots/dm_deleteHabit.jpg" alt="" width="220" />   |
-| Navigation Bar    | <img src="app/screenshots/lm_navBAr.jpg" alt="" width="220" />   | <img src="app/screenshots/dm_navBAr.jpg" alt="" width="220" />   |
+| Navigation Bar    | <img src="app/screenshots/lm_navBar.jpg" alt="" width="220" />   | <img src="app/screenshots/dm_navBar.jpg" alt="" width="220" />   |
 | Analytics Screen     | <img src="app/screenshots/lm_analytics.jpg" alt="" width="220" />   | <img src="app/screenshots/dm_analytics.jpg" alt="" width="220" />   |
 | Settings Screen     | <img src="app/screenshots/lm_settings.jpg" alt="" width="220" />   | <img src="app/screenshots/dm_settings.jpg" alt="" width="220" />   |
 
